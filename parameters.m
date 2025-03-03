@@ -3,7 +3,7 @@
 
 % --- Quick changing useful parameters
 model.dt           = 1;  % sampling rate
-truth.K = 100;                        % total time steps 
+truth.K = 100;           % total time steps 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Basic Parameters
@@ -17,7 +17,7 @@ model.T0 = model.dt; % sim/filter rate
 time_array = (0:1:truth.K) * model.T0;
 model.len_time = length(time_array);
 model.Time = time_array'; 
-proc_u = 1; % process noise uncertainty 
+proc_u = 0; % process noise uncertainty 
 model.B= proc_u*eye(model.x_dim);         
 model.Q= model.B*model.B';  % process noise covariance
 

@@ -41,7 +41,7 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
         % 1. Time handling
         model = cfig.time(model, k);
 
-        % 3. Births
+        % 2. Births
         %
         % directly bakes birth model into prior intensity GMM
         [m_predict, P_predict, w_predict] = gen_gms_kdesilv_dual(model, w_predict, m_predict, P_predict, ...
@@ -54,14 +54,14 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
                                                 w_birth, m_birth, P_birth, J_rsp + J_birth);
         %}
                                                                                                               
-        % 4. Gating
+        % 3. Gating
         if model.gate_flag
             Zk = gate_meas(cfig, model, meas.Z{k}, m_predict, P_predict);        
         else
             Zk = meas.Z{k};
         end
             
-        % 5. Update
+        % 4. Update
         m = size(Zk,2); % number of measurements
         % --- missed detections
         w_update = model.Q_D*w_predict;
@@ -85,10 +85,10 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
             end
         end
 
-        % 6. Resampling
+        % 5. Resampling
         [m_update, ~, w_update] = gen_gms_kdesilv(model,w_update,m_update,P_update,J_rsp);
 
-        % 2. Predict
+        % 6. Predict
         % --- survivors
         m_predict = cfig.fprop(model, m_update, 'noiseless');
         betaS = (betaS_scale/ceil(sum(w_update)))*(4/(J_rsp*(model.x_dim+2))) ^ (2/(model.x_dim+4)); % Silverman's rule of thumb

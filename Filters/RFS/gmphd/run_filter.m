@@ -85,14 +85,12 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
         end
 
         % 6. Pruning, merging, and capping
-        if m~=0
-            [w_update,m_update,P_update]= gaus_prune(w_update,m_update,P_update,...
-                'ElimThreshold',elim_threshold);
-            [w_update,m_update,P_update]= gaus_merge(w_update,m_update,P_update,...
-                'MergeThreshold',merge_threshold);   
-            [w_update,m_update,P_update]= gaus_cap(w_update,m_update,P_update,...
-                'Lmax',cap_limit);
-        end
+        [w_update,m_update,P_update]= gaus_prune(w_update,m_update,P_update,...
+            'ElimThreshold',elim_threshold);
+        [w_update,m_update,P_update]= gaus_merge(w_update,m_update,P_update,...
+            'MergeThreshold',merge_threshold);   
+        [w_update,m_update,P_update]= gaus_cap(w_update,m_update,P_update,...
+            'Lmax',cap_limit);
 
         % 7. State extraction [1] (not used by filter)
         idx= find(w_update > 0.5 );

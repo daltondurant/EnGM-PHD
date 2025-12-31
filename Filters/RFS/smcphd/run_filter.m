@@ -19,8 +19,8 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
 %
     % --- filter parameters
     run_flag= 'disp';   % 'disp' or 'silence' for on the fly output
-    J_rsp   = 250;      % resampling fixed number of particles
-    J_birth = 10;       % number of births per time step 
+    J_rsp   = 750;      % resampling fixed number of particles
+    J_birth = 100;      % number of births per time step 
         
     % --- output variables
     est.X = cell(meas.K,1);  % states

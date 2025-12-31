@@ -52,7 +52,7 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
         m_predict = cat(2,m_predict,m_birth); 
         P_predict = cat(3,P_predict,P_birth);
         w_predict = cat(1,w_predict,w_birth);  
-                                                                                                     
+
         % 4. Gating
         if model.gate_flag
             Zk = gate_meas(cfig, model, meas.Z{k}, m_predict, P_predict);        
@@ -93,12 +93,25 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
             'Lmax',cap_limit);
 
         % 7. State extraction [1] (not used by filter)
+        %
         idx= find(w_update > 0.5 );
         for ii = 1:length(idx)
             repeat_num_targets= round(w_update(idx(ii)));
             est.X{k} = [ est.X{k} repmat(m_update(:,idx(ii)),[1,repeat_num_targets]) ];
             est.N(k) = est.N(k) + repeat_num_targets;
         end
+        %
+        %{
+        % . State Extraction    (alternative)
+        if sum(w_update) > 0.5
+            [~, idx] = maxk(w_update, round(sum(w_update)));
+            est.X{k} = m_update(:,idx);
+            est.N(k) = round(sum(w_update));
+        else
+            est.N(k)= 0; est.X{k}= [];
+        end
+        %}
+
         est.G(k) = length(w_update);
         
         % 8. Diagnostics

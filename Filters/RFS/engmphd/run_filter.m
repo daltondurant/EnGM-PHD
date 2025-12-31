@@ -13,7 +13,7 @@
 % [1] Dalton Durant and Renato Zanetti. "Kernel-Based Ensemble Gaussian 
 % Mixture Probability Hypothesis Density Filter." In 28th International 
 % Conference on Information Fusion, Rio de Janeiro, Brazil. 2025.
-%
+% 
 function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
 %
     % --- filter parameters
@@ -30,38 +30,56 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
     model.stream = stream;
 
     % --- initial prior
-    w_predict = 1e-16;
-    m_predict = model.m0 + sqrtm(model.P0)*randn(stream,[model.x_dim,1]);
-    P_predict = model.P0;
-
-    betaS_scale = 1; % Silverman's rule of thumb heuristic scaling coefficient (>1 more conservative / <1 more confident)
+    w_update = 1e-16;
+    m_update = model.m0 + sqrtm(model.P0)*randn(stream,[model.x_dim,1]);
+    betaS_scale = 5e-2;
 
     % --- recursive filtering
     for k = 1:meas.K % time loop
         % 1. Time handling
         model = cfig.time(model, k);
 
-        % 2. Births
-        %
-        % directly bakes birth model into prior intensity GMM
-        [m_predict, P_predict, w_predict] = gen_gms_kdesilv_dual(model, w_predict, m_predict, P_predict, ...
-                                                model.w_birth, model.m_birth, model.P_birth, J_rsp + J_birth);
-        %
+        % 2. Predict
+        % --- survivors
+        m_predict = cfig.fprop(model, m_update, 'noiseless'); % surviving means
+        w_predict= model.P_S*w_update; % surviving weights
+        % surviving covariances
+        if k > 1
+            betaSk = betaS_scale * (4/(J_rsp*(model.x_dim+2))) ^ (2/(model.x_dim+4)); % Silverman's rule of thumb
+            mum = mean(m_predict,2); ex = m_predict - mum; Pum = ((ex * ex') / (J_rsp-1)); % sample covariance
+            P_predict = repmat((betaSk*Pum)+model.Q,1,1,J_rsp); % KDE constructed covariances
+        else
+            P_predict = model.P0;
+        end
+
+        % 3. Births
+        % samples from GMM birth model
+        [m_birth, ~, w_birth] = gen_gms(model,model.w_birth,model.m_birth,model.P_birth,J_birth); 
+        betagk = betaS_scale * (4/(J_birth*(model.x_dim+2))) ^ (2/(model.x_dim+4)); % Silverman's rule of thumb
+        mum = mean(m_birth,2); ex = m_birth - mum; Pum = ((ex * ex') / (J_birth-1)); % sample covariance
+        P_birth = repmat((betagk*Pum),1,1,J_birth); % KDE constructed covariances
+        
         %{
-        % constructs a GMM from birth model first, then bakes into prior intensity GMM
-        [m_birth, P_birth, w_birth] = gen_gms_kdesilv(model,model.w_birth,model.m_birth,model.P_birth,J_birth); 
+        % reconstruct the prior intensity by sampling from a dual GMM
         [m_predict, P_predict, w_predict] = gen_gms_kdesilv_dual(model, w_predict, m_predict, P_predict, ...
                                                 w_birth, m_birth, P_birth, J_rsp + J_birth);
         %}
+        %
+        % constructs the prior intensity like the GM-PHD filter does
+        % --- append
+        m_predict = cat(2,m_predict,m_birth); 
+        P_predict = cat(3,P_predict,P_birth);
+        w_predict = cat(1,w_predict,w_birth); 
+        %
                                                                                                               
-        % 3. Gating
+        % 4. Gating
         if model.gate_flag
             Zk = gate_meas(cfig, model, meas.Z{k}, m_predict, P_predict);        
         else
             Zk = meas.Z{k};
         end
             
-        % 4. Update
+        % 5. Update
         m = size(Zk,2); % number of measurements
         % --- missed detections
         w_update = model.Q_D*w_predict;
@@ -85,16 +103,8 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
             end
         end
 
-        % 5. Resampling
-        [m_update, ~, w_update] = gen_gms_kdesilv(model,w_update,m_update,P_update,J_rsp);
-
-        % 6. Predict
-        % --- survivors
-        m_predict = cfig.fprop(model, m_update, 'noiseless');
-        betaS = (betaS_scale/ceil(sum(w_update)))*(4/(J_rsp*(model.x_dim+2))) ^ (2/(model.x_dim+4)); % Silverman's rule of thumb
-        mum = mean(m_predict,2); ex = m_predict - mum; Pum = ((ex * ex') / (J_rsp-1)); % Pbar (sample covariance)
-        P_predict = repmat((betaS*Pum)+model.Q,1,1,J_rsp);
-        w_predict= model.P_S*w_update; % surviving weights
+        % 6. Resampling
+        [m_update, ~, w_update] = gen_gms(model,w_update,m_update,P_update,J_rsp);
 
         % 7. State Extraction   
         if sum(w_update) > 0.5

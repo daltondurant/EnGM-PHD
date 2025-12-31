@@ -1,5 +1,5 @@
 %% A simple 3D example.
-% 03-03-2025 %
+% 12-31-2025 %
 %**************************************************************************
 % author: dalton durant
 % email: ddurant@utexas.edu, thedaltondurant@gmail.com
@@ -42,7 +42,7 @@ run('parameters.m')
 cfig.nMonte = 1; % number of Monte Carlo simulations
 toggle_loadmat.truths      = false; % load truth.mat from /.data
 toggle_loadmat.results     = false; % load filter .mat's from /.data
-toggle_cleardata           = true;  % overwrite the .mat's in /.data
+toggle_cleardata           = false; % overwrite the .mat's in /.data
 
 filters = {
            % GM-PHD
@@ -56,7 +56,7 @@ filters = {
 colors = {% colorblind colors
           '#D81B60'; ... % red
           '#FFB000'; ... % yellow
-          '#009E73'; ... % green
+          '#0072B2'; ... % blue
           };
 
 run_this = [1:3]; % run these filters
@@ -85,24 +85,32 @@ else
         fprintf('\n Monte Carlo Iteration: %d \n', iMonte)
         starttime = tic;
         % --- run sim
+        meas_STORE{iMonte}.K  = model.len_time; 
         meas_STORE{iMonte}.Z  = cell(model.len_time,1); % measurements
         meas_STORE{iMonte}.C  = cell(model.len_time,1); % state space representation of clutter measurements (helpful for plotting)
-        meas_STORE{iMonte}.K  = model.len_time; 
         for tk = 1:model_STORE{iMonte}.len_time
+            Zk = []; Ck = []; Tk = []; IDk = [];
             % generate measurements
             if truth.total_tracks > 0
                 idx = find( rand(stream, [truth.total_tracks,1]) <= model.P_D ); % detected target indices
                 if ~isempty(idx)
-                    meas_STORE{iMonte}.Z{tk} = cfig.h(model_STORE{iMonte}, truth.X{tk}(:,idx), 'noise');
+                    z = cfig.h(model_STORE{iMonte}, truth.X{tk}(:,idx), 'noise');
+                    rho = z(1,:); az = z(2,:); el = z(3,:);
+                    Zk   = cat(2, Zk, z);
+                    Ck   = cat(2, Ck, [rho.*cos(az).*cos(el); rho.*sin(az).*cos(el); rho.*sin(el)]); % Cartesian detection points (for plotting)
                 end
             end
             % generate clutter 
             if model.lambda_c > 0
                 N_c = poissrnd(model.lambda_c); % number of clutter points
-                meas_STORE{iMonte}.C{tk} = repmat(model.range_c(:,1),[1 N_c]) + diag(model.range_c*[ -1; 1])*rand(3,N_c); % Cartesian clutter points (for plotting)   
-                C = cfig.h(model,meas_STORE{iMonte}.C{tk},'noiseless');
-                meas_STORE{iMonte}.Z{tk}= [ meas_STORE{iMonte}.Z{tk} C ];  
+                c = repmat(model.range_c(:,1),[1 N_c]) + diag(model.range_c*[ -1; 1])*rand(3,N_c); % Cartesian clutter points (for plotting)   
+                z_c = cfig.h(model,c,'noiseless'); 
+                Zk = cat(2, Zk, z_c); 
+                Ck   = cat(2, Ck, c); % Cartesian clutter points (for plotting)                                                     
             end
+            % store
+            meas_STORE{iMonte}.Z{tk}  = Zk;
+            meas_STORE{iMonte}.C{tk}  = Ck;
         end
     end
     %--- if mat doesn't exist, then make one

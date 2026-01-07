@@ -46,7 +46,7 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
         % surviving covariances
         if k > 1
             betaSk = betaS_scale * (4/(J_rsp*(model.x_dim+2))) ^ (2/(model.x_dim+4)); % Silverman's rule of thumb
-            mum = mean(m_predict,2); ex = m_predict - mum; Pum = ((ex * ex') / (J_rsp-1)); % sample covariance
+            wsum = sum(w_predict); mum  = (m_predict * w_predict) / wsum; em = m_predict - mum; Pum   = em * (em .* w_predict')' / wsum;    
             P_predict = repmat((betaSk*Pum)+model.Q,1,1,J_rsp); % KDE constructed covariances
         else
             P_predict = model.P0;
@@ -56,7 +56,7 @@ function [model,meas,est] = run_filter(stream,cfig,model,meas,est)
         % samples from GMM birth model
         [m_birth, ~, w_birth] = gen_gms(model,model.w_birth,model.m_birth,model.P_birth,J_birth); 
         betagk = betaS_scale * (4/(J_birth*(model.x_dim+2))) ^ (2/(model.x_dim+4)); % Silverman's rule of thumb
-        mum = mean(m_birth,2); ex = m_birth - mum; Pum = ((ex * ex') / (J_birth-1)); % sample covariance
+        wsum = sum(w_birth); mum  = (m_birth * w_birth) / wsum; em = m_birth - mum; Pum   = em * (em .* w_birth')' / wsum;    
         P_birth = repmat((betagk*Pum),1,1,J_birth); % KDE constructed covariances
         
         %{
